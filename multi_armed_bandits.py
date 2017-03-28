@@ -37,7 +37,30 @@ print(cum_reward)
 # plot average rewards over time
 for e in range(len(eps)):
     plt.plot(cum_reward[e]/sz_testbed, label = 'e='+str(eps[e]))
+#plt.legend()
+#plt.show()
+
+# the learning method with the lowest e-greedy learns slowly but constantly grows over time.
+
+# UCB method, selection of arm with preference to ones with max variance
+r_select_counts = np.zeros((sz_testbed,sz_bandit))
+r_mean = np.zeros((sz_testbed, sz_bandit))
+c = 0.5 #parameter to control variance in UCB
+cum_reward = np.zeros(timesteps)
+for i in range(timesteps):
+    for ix,row in enumerate(r_mean):
+        #select arm
+        arm = np.argmax(row + c * np.sqrt(np.log(i)/r_select_counts[ix]))
+        # update arm selection count
+        r_select_counts[ix,arm] += 1
+        #get reward for that arm
+        R_t = np.random.normal(testbed[ix,arm], 1)
+        cum_reward[i] += R_t
+        #update mean reward for that arm
+        row[arm] += (R_t - row[arm])/r_select_counts[ix,arm]
+
+plt.plot(cum_reward/sz_testbed, label='UCB')
 plt.legend()
 plt.show()
 
-# the learning method with the lowest e-greedy learns slowly but constantly grows over time.
+
