@@ -40,6 +40,23 @@ for e in range(len(eps)):
 #plt.show()
 
 # the learning method with the lowest e-greedy learns slowly but constantly grows over time.
+# next we try to learn with a constant step size instead of time varying step size. The above method works well when the reward distributions are stationary as the expected values of rewards can be calculated by the average of the past rewards. In case of non-stationary distributions the most popular technique is to have a constant step size and use that to take a weighted average of all past rewards of an arm, weighted in a descending order of their recency.
+alpha = 0.1 # step size 
+for e in range(len(eps)):
+    # reset counts of selection and expected rewards
+    r_select_counts = np.zeros((sz_testbed,sz_bandit))
+    r_mean = np.zeros((sz_testbed, sz_bandit))
+    for i in range(timesteps):
+        for ix,row in enumerate(r_mean):
+            #select arm
+            arm = np.argmax(row) if np.random.uniform() <= (1 - eps[e]) else np.random.choice(np.arange(sz_bandit))
+            # update arm selection count
+            r_select_counts[ix,arm] += 1
+            #get reward for that arm
+            R_t = np.random.normal(testbed[ix,arm], 1)
+            cum_reward[e,i] += R_t
+            #update mean reward for that arm
+            row[arm] = alpha*(1-alpha)*R_t + (1-alpha)*row[arm]
 
 # UCB method, selection of arm with preference to ones with max variance
 r_select_counts = np.zeros((sz_testbed,sz_bandit))
@@ -88,3 +105,4 @@ for alpha in [0.1,0.4]:
 
 plt.legend()
 plt.show()
+
