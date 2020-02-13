@@ -1,15 +1,9 @@
-#%%
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
 from dataclasses import dataclass, field
-from collections import defaultdict
-from box import Box
 from typing import List
 
 
-#%%
 @dataclass
 class TestBed:
     reward_mean: float = 0.
@@ -73,7 +67,6 @@ class Bandit:
         self.num_draws = np.zeros(self.testbed.num_arms)
 
 
-#%%
 def average_multiple_runs(epsilon=0.0, runs=1000):
     run_rewards = []
     for r in range(runs):
