@@ -4,6 +4,46 @@ from dataclasses import dataclass, field
 from typing import List
 
 
+def epsilon_greedy(expected_rewards: np.ndarray, num_draws: np.ndarray,
+                   **kwargs):
+    non_greedy = np.random.uniform() <= kwargs.get('epsilon', 0)
+    max_reward_arms = np.where(expected_rewards == expected_rewards.max())[0]
+    if non_greedy:
+        arm = np.random.choice(len(expected_rewards))
+    else:
+        arm = np.random.choice(max_reward_arms)
+    return arm
+
+
+def optimistic_initial_values(expected_rewards: np.ndarray,
+                              num_draws: np.ndarray, **kwargs):
+    optimistic_rewards = expected_rewards + kwargs.get(
+        'optimistic_initial_reward', 0)
+    return epsilon_greedy(optimistic_rewards, num_draws)
+
+
+def upper_confidence_bound(expected_rewards: np.ndarray, num_draws: np.ndarray,
+                           **kwargs):
+    if 0 in num_draws:
+        return np.random.choice(np.where(num_draws == 0)[0])
+    ucbs = np.zeros_like(expected_rewards)
+    for i in range(len(expected_rewards)):
+        ucbs[i] = expected_rewards[i] + kwargs.get(
+            'ucb_weight', 0.1) * np.sqrt(
+                np.log(num_draws.sum()) / num_draws[i])
+
+    max_ucb_arms = np.where(ucbs == ucbs.max())[0]
+    return np.random.choice(max_ucb_arms)
+
+
+POLICIES = {
+    'greedy': epsilon_greedy,
+    'epsilon_greedy': epsilon_greedy,
+    'optimistic_initial_values': optimistic_initial_values,
+    'upper_confidence_bound': upper_confidence_bound
+}
+
+
 @dataclass
 class TestBed:
     reward_mean: float = 0.
@@ -26,32 +66,40 @@ class TestBed:
 @dataclass
 class Bandit:
     testbed: TestBed
-    epsilon: float = 0.0
+    policy: str = 'greedy'
+    learning_rate: float = 0.0
     draws: List[int] = field(default_factory=list)
     rewards: List[int] = field(default_factory=list)
     expected_rewards: np.ndarray = np.zeros(10)
     num_draws: np.ndarray = np.zeros(10)
+    epsilon: float = 0.0
+    optimistic_initial_reward: float = 0.0
+    ucb_weight: float = 0.1
 
     def __post_init__(self):
         self.expected_rewards = np.zeros(self.testbed.num_arms)
         self.num_draws = np.zeros(self.testbed.num_arms)
+        if self.policy not in POLICIES:
+            raise ValueError(
+                f'''Policy {self.policy} is not available. Choose one of {', '.join(POLICIES.keys())}'''
+            )
 
     def choose_arm(self) -> int:
-        non_greedy = np.random.uniform() <= self.epsilon
-        max_reward_arms = np.where(
-            self.expected_rewards == self.expected_rewards.max())[0]
-        if non_greedy:
-            arm = np.random.choice(self.testbed.num_arms)
-        else:
-            arm = np.random.choice(max_reward_arms)
-        return arm
+        return POLICIES[self.policy](
+            expected_rewards=self.expected_rewards,
+            num_draws=self.num_draws,
+            epsilon=self.epsilon,
+            optimistic_intial_reward=self.optimistic_initial_reward,
+            ucb_weight=self.ucb_weight)
 
     def draw(self) -> (int, float):
         arm = self.choose_arm()
         reward = self.testbed.draw_arm(arm)
         self.num_draws[arm] += 1
-        self.expected_rewards[arm] += (
-            reward - self.expected_rewards[arm]) / self.num_draws[arm]
+        lr = (1 / self.num_draws[arm]
+              ) if self.learning_rate == 0 else self.learning_rate
+        self.expected_rewards[arm] += lr * (reward -
+                                            self.expected_rewards[arm])
         self.rewards.append(reward)
         self.draws.append(arm)
         return (arm, reward)
@@ -70,8 +118,10 @@ class Bandit:
 def average_multiple_runs(epsilon=0.0, runs=1000):
     run_rewards = []
     for r in range(runs):
-        b = Bandit(TestBed(), epsilon)
-        b.run_episode()
+        b = Bandit(TestBed(),
+                   'optimistic_initial_values',
+                   optimistic_initial_reward=5)
+        b.run_episode(length=1000)
         run_rewards.append(b.rewards)
     return np.vstack(run_rewards).mean(axis=0)
 
