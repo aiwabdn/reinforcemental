@@ -127,7 +127,7 @@ def average_multiple_runs(epsilon=0.0, runs=1000):
 
 
 def compare_greedy_levels(*epsilons: float):
-    plt.figure(figsize=(12, 10))
+    plt.figure(figsize=(18, 12))
     for e in epsilons:
         mean_rewards = average_multiple_runs(e)
         plt.plot(range(len(mean_rewards)), mean_rewards, label=e)
